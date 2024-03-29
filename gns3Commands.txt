@@ -1,0 +1,152 @@
+REDE D
+
+	Address:   10.5.2.0              
+	Netmask:   255.255.255.192 = 26  
+	Wildcard:  0.0.0.63              
+
+	Network:   10.5.2.0/26     
+	Broadcast: 10.5.2.63             
+	HostMin:   10.5.2.1             
+	HostMax:   10.5.2.62             
+	Hosts/Net: 62
+
+
+REDES A, B, C
+
+
+	Address:   193.137.100.0        
+	Netmask:   255.255.254.0 = 23   
+	Wildcard:  0.0.1.255          
+	=>
+	Network:   193.137.100.0/23   
+	Broadcast: 193.137.101.255    
+	HostMin:   193.137.100.1    
+	HostMax:   193.137.101.254   
+	Hosts/Net: 510                   
+
+
+SUBNETS
+
+REDE C{
+
+	Netmask:   255.255.255.0 = 24   
+	Wildcard:  0.0.0.255             
+
+	Network:   193.137.101.0/24    
+	Broadcast: 193.137.101.255     
+	HostMin:   193.137.101.1      
+	HostMax:   193.137.101.254     
+	Hosts/Net: 254                   
+
+
+}
+
+REDES A, B
+
+	Address:   193.137.100.0         
+	Netmask:   255.255.255.0 = 24    
+	Wildcard:  0.0.0.255             
+	=>
+	Network:   193.137.100.0/24      
+	Broadcast: 193.137.100.255       
+	HostMin:   193.137.100.1         
+	HostMax:   193.137.100.254
+	Hosts/Net: 254                  
+
+
+SUBNETS
+
+	Netmask:   255.255.255.128 = 25  
+	Wildcard:  0.0.0.127             
+
+
+
+REDE A {
+	Network:   193.137.100.0/25      
+	Broadcast: 193.137.100.127       
+	HostMin:   193.137.100.1         
+	HostMax:   193.137.100.126       
+	Hosts/Net: 126                   
+}
+
+
+REDE B{
+
+	Network:   193.137.100.128/25    
+	Broadcast: 193.137.100.255       
+	HostMin:   193.137.100.129       
+	HostMax:   193.137.100.254
+	Hosts/Net: 126
+
+}
+
+
+R1 CONFIG
+
+R1#conf t
+R1(config)#interface FastEthernet0/1 
+R1(config-if)#ip add 193.137.101.1 255.255.255.0
+R1(config-if)#no shut
+R1(config-if)#exit
+R1(config)#interface FastEthernet0/0         
+R1(config-if)#ip add 193.137.100.1 255.255.255.128
+R1(config-if)#no shut
+R1(config)#ip route 193.137.100.128 255.255.255.128 193.137.101.2
+R1(config-if)#exit
+R1#copy running-config startup-config
+
+
+
+R2 CONFIG
+
+R2#conf t
+R2(config)#interface FastEthernet0/0
+R2(config-if)#ip add 193.137.101.2 255.255.255.0
+R2(config-if)#no shut
+R2(config-if)#exit
+R2(config)#interface FastEthernet0/1
+R2(config-if)#ip add 193.137.100.129 255.255.255.128
+R2(config-if)#no shut
+R2(config)#ip route 193.137.100.0 255.255.255.128 193.137.101.1
+R2(config-if)#exit
+R2#copy running-config startup-config
+
+
+
+R3 CONFIG
+
+R3#conf t
+R3(config)#access-list 30 permit 10.5.2.0 0.0.0.63
+R3(config)#ip nat inside source list 30 interface FastEthernet0/0 overload
+R3(config)#interface FastEthernet0/0
+R3(config-if)#ip address 193.137.101.3 255.255.255.0
+R3(config-if)#ip nat outside
+R3(config-if)#no shut
+R3(config-if)#exit
+R3(config)#interface FastEthernet0/1                                      
+R3(config-if)#ip address 10.5.2.1 255.255.255.192   
+R3(config-if)#ip nat inside
+R3(config-if)#no shut
+R3(config-if)#exit
+R3#copy running-config startup-config
+
+
+Cliente 1
+address 10.5.2.61
+netmask 255.255.255.192
+gateway 10.5.2.1
+
+Cliente 2
+address 10.5.2.62
+netmask 255.255.255.192
+gateway 10.5.2.1
+
+Cliente 3
+address 193.137.100.254
+netmask 255.255.255.128
+gateway 193.137.100.129
+
+Server
+address 193.137.100.126
+netmask 255.255.255.128
+gateway 193.137.100.1
