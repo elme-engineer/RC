@@ -11,6 +11,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <errno.h>
+#include <signal.h>
 #include <pthread.h>
 
 
@@ -36,5 +38,7 @@ void read_config_file(char *file_name);
 void *udp();
 void *tcp();
 void process_client(int client_fd);
+int get_user(char *username, char *password);
+void send_msg_udp(char *msg, int udp_fd, socklen_t cliente_socket_len, struct sockaddr_in client_addr);
 
 #endif

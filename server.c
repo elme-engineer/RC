@@ -56,11 +56,133 @@ void init() {
     }
 }
 
+void send_msg_udp(char *msg, int udp_fd, socklen_t cliente_socket_len, struct sockaddr_in client_addr){
 
+    if(sendto(udp_fd, msg, strlen(msg), 0, (struct sockaddr*)&client_addr,cliente_socket_len) == -1) 
+        error("Error sending message.");
+}
 
 void *udp(){
 
+    struct sockaddr_in server_addr, admin_addr;
+    socklen_t admin_socket_len = sizeof(admin_addr);
+    char  action[15], username[64], password[64], type[15];
+    int udp_fd, recv_len;
+    int user = 0, admin = 0;
+    char input[BUF_SIZE];
 
+    
+    
+    bzero((void*) &server_addr, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(udp_port);
+    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    
+    if((udp_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) 
+        error("Error creating udp socket");
+    if(bind(udp_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) 
+        error("Bind udp error");
+
+
+    // login admin
+    do{
+        memset(input, 0, strlen(input));
+        memset(action, 0, strlen(action));
+        memset(username, 0, strlen(username));
+        memset(password, 0, strlen(password));
+
+        if((recv_len = recvfrom(udp_fd, input, BUF_SIZE, 0, (struct sockaddr *) &admin_addr, (socklen_t *)&admin_socket_len)) == -1) 
+            error("Error in recvfrom");
+
+        input[recv_len]='\0';
+
+        if (sscanf(input, "%s %s %s",action, username, password)){
+            if(!strcmp(action, "LOGIN")){
+
+                if(strlen(username) == 0 || strlen(password) == 0){
+                    send_msg_udp("<LOGIN> <username> <password>\n", udp_fd, admin_socket_len, admin_addr);
+                    continue;
+                }
+                user = get_user(username, password);
+
+                if(user == -1){
+                    send_msg_udp("Login rejected.\n", udp_fd, admin_socket_len, admin_addr);
+                    continue;
+                }
+
+                if(!strcmp(users_array[user].type, "administrator")){
+
+                    send_msg_udp("Welcome!\n", udp_fd, admin_socket_len, admin_addr);
+                    admin = 1;
+
+                }else
+                    send_msg_udp("Login rejected.\n", udp_fd, admin_socket_len, admin_addr);
+
+            }
+        }
+
+
+    }while(!admin);
+
+
+    while(admin) {
+        
+        memset(input, 0, strlen(input));
+        memset(action, 0, strlen(action));
+        memset(username, 0, strlen(username));
+        memset(password, 0, strlen(password));
+        memset(type, 0, strlen(type));
+
+        if((recv_len = recvfrom(udp_fd, input, BUF_SIZE, 0, (struct sockaddr *) &admin_addr, (socklen_t *)&admin_socket_len)) == -1) 
+            error("Error in recvfrom");
+
+        
+        input[recv_len]='\0';
+
+        // add user
+        if (sscanf(input, "%s %s %s %s",action, username, password, type)){
+            if(!strcmp(action, "ADD_USER")){
+                
+                if(strlen(username) == 0 || strlen(password) == 0 || strlen(type) == 0){
+
+                    send_msg_udp("<ADD_USER> <username> <password> <type>\n", udp_fd, admin_socket_len, admin_addr);    
+                    continue;
+                }
+
+                send_msg_udp("User created.\n", udp_fd, admin_socket_len, admin_addr);
+                
+            }
+        }
+        
+        if (sscanf(input, "%s %s",action, username)) {
+            if(!strcmp(action, "DEL")){
+        
+                if(strlen(username) == 0){
+
+                    send_msg_udp("<DEL> <username>\n", udp_fd, admin_socket_len, admin_addr);    
+                    continue;
+                }
+
+                send_msg_udp("User deleted.\n", udp_fd, admin_socket_len, admin_addr);
+
+            }
+        }
+        if (sscanf(input, "%s",action)){
+            if(!strcmp(action, "LIST")){
+                
+                send_msg_udp("User list:\n", udp_fd, admin_socket_len, admin_addr);
+            }
+
+            if(!strcmp(action, "QUIT_SERVER")){
+        
+                send_msg_udp("Closing server...\n", udp_fd, admin_socket_len, admin_addr);
+                close(udp_fd);
+    
+            }
+
+        }
+    }
 }
 
 void *tcp(){
@@ -101,17 +223,9 @@ void *tcp(){
   }
 }
 
-int get_user(char* user_input) {
+int get_user(char *username, char *password) {
 
-    char username[64], password[64];
-    int i = 0;
-    char* token = strtok(user_input, " ");
-    
-    strcpy(username, token);
-    token = strtok(NULL, " ");
-    strcpy(password, token);
-
-    for(i = 0; i < USERS_AMOUNT; ++i) {
+    for(int i = 0; i < USERS_AMOUNT; ++i) {
         if(strcmp(username, users_array[i].username) == 0) {
             if(strcmp(password, users_array[i].password) == 0) {
                 return i;
@@ -126,6 +240,7 @@ void process_client(int client_fd)
 {
 	int nread = 0, user, size;
 	char buffer[BUF_SIZE], name[64], action[20], classSize[4], subTxt[50];
+    char username[64], password[64];
 
     char msg[BUF_SIZE] = "Login: <username> <password>\n";
     write(client_fd, msg, strlen(msg));
@@ -134,15 +249,21 @@ void process_client(int client_fd)
     nread = read(client_fd, buffer, BUF_SIZE-1);
     buffer[nread] = '\0';
     
-    user = get_user(buffer);
-    
-    if(user == -1){
+    if (sscanf(buffer, "%s %s", username, password)) {
 
-        write(client_fd, "REJECTED\n", 9);
+        user = get_user(username, password);
+    
+        if(user == -1){
+
+            write(client_fd, "REJECTED\n", 9);
+            return;
+
+        }else
+            write(client_fd, "OK\n", 3);
+    }else
         return;
 
-    }else
-        write(client_fd, "OK\n", 3);
+    
 
 
     char* userType = users_array[user].type;
@@ -222,11 +343,15 @@ int main(int argc, char *argv[]) {
     tcp_port = atoi(argv[1]);
     udp_port = atoi(argv[2]);
 
+    
+
 	init();
 	read_config_file(argv[3]);
 
     pthread_create(&threads[0], NULL, udp, NULL);
     pthread_create(&threads[1], NULL, tcp, NULL);
+
+    
 
     //Wait for all threads to finish
 	for(int i = 0; i < 2; ++i) {
