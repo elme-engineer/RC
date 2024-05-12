@@ -2,59 +2,258 @@
 
 FILE* conf_file;
 
+void show_user_list(){
+
+    pUser temp_node = user_list_head;
+
+    printf("nigaaaaaaaaaaaa\n");
+
+    while(temp_node != NULL){
+
+        printf("%s %s %s\n", temp_node->username, temp_node->password, temp_node->type);
+
+        printf("fdsssssss\n");
+
+        temp_node = temp_node->next;
+    }
+
+    printf("ssssssssssss\n");
+
+}
+
 void error(char *str) {
 	perror(str);
 	exit(-1);
 }
 
+void add_user(pUser new_user){
 
-void read_config_file(char *file_name){
+    if(user_list_tail == NULL){
 
-    conf_file = fopen(file_name, "r+");
-    if(conf_file == NULL)
-        error("ERROR OPENING CONFIGURATION FILE\n");
+        user_list_head = new_user;
+        user_list_tail = new_user;
+    }else{
+
+        user_list_tail->next = new_user;
+        new_user->prev = user_list_tail;
+        user_list_tail = new_user;
+    }
 
 
-    char line[256];
-    int i = 0;
-     while(fgets(line, 256, conf_file)) {
-        line[strcspn(line, "\n")] = 0;
-        char* token = strtok(line, ";");
-        int count = 0; 
+}
 
-        while(token != NULL) {
-            if(count == 0) 
-                strcpy(users_array[i].username, token);
-            if(count == 1) 
-                strcpy(users_array[i].password, token);
-            if(count == 2) 
-                strcpy(users_array[i].type, token);
+void free_node(pUser node){
 
-            count++;
-            token = strtok(NULL, ";");
+    free(node->type);
+    free(node->password);
+    free(node->username);
+    free(node);
+
+
+}
+
+int del_user(char *username){
+
+    pUser current_user = user_list_tail;
+    
+    //list is empty
+    if(user_list_tail == NULL)
+        return 0;
+
+    //list with only one user
+    if(user_list_head == user_list_tail){
+
+        user_list_head = NULL;
+        user_list_tail = NULL;
+        free_node(current_user);
+        return 1;
+    }
+
+    //delete last user of list
+    if(!strcmp(user_list_tail->username, username)){
+
+        user_list_tail = user_list_tail->prev;
+        user_list_tail->next = NULL;
+        free_node(current_user);
+        return 1;
+    }
+    
+    current_user = user_list_head;
+
+    //delete 1st user of list
+    if(!strcmp(current_user->username, username)){
+
+
+        user_list_head = current_user->next;
+        free_node(current_user);
+        return 1;
+    }
+
+    pUser prev_user = current_user;
+    current_user = current_user->next;    
+
+    while(current_user != NULL){
+
+        if(!strcmp(current_user->username, username)){
+
+            prev_user->next = current_user->next;
+            current_user->next->prev = prev_user;
+            free_node(current_user);
+            return 1;
         }
 
-        i++;
+        current_user = current_user->next;
+        prev_user = prev_user->next;
+    }
+
+    return 0;
+}
+
+//check if user already exists
+int validate_user(char *username){
+
+    pUser current_user = user_list_head;
+
+    while(current_user != NULL){
+
+        if(!strcmp(current_user->username, username))
+            return 0;
+
+        current_user = current_user->next;
+    }
+
+    return 1;
+}
+
+pUser create_user(char *username, char *password, char *type){
+
+    pUser new_user = malloc(sizeof(struct user));
+    new_user->username = malloc(sizeof(strlen(username + 1)));
+    new_user->password = malloc(sizeof(strlen(password + 1)));
+    new_user->type = malloc(sizeof(strlen(type + 1)));
+
+    if(new_user->type == NULL){
+
+        error("MEM ALOC FAILED\n");
+        free(new_user->type);
+        free(new_user->password);
+        free(new_user->username);
+        free(new_user);
+        return NULL;
+    }
+
+    if(new_user->password == NULL){
+
+        error("MEM ALOC FAILED\n");
+        free(new_user->password);
+        free(new_user->username);
+        free(new_user);
+        return NULL;
+    }
+
+    if(new_user->username == NULL){
+
+        error("MEM ALOC FAILED\n");
+        free(new_user->username);
+        free(new_user);
+        return NULL;
+    }
+
+    if(new_user == NULL){
+
+        error("MEM ALOC FAILED\n");
+        free(new_user);
+        return NULL;
+    }
+
+    strcpy(new_user->username, username);
+    strcpy(new_user->password, password);
+    strcpy(new_user->type, type);
+    new_user->socketfd = 0;
+    new_user->next = NULL;
+    new_user->prev = NULL;
+
+    users_amount++;
+
+    return new_user;
+
+}
+
+void save_config_file(){
+
+    conf_file = fopen(filename, "w+");
+
+    if(conf_file == NULL){
+        error("ERROR SAVING TO CONFIGURATION FILE\n");
+        return;
+    }
+
+    char line[256];
+    pUser current_user = user_list_head;
+
+    while(current_user != NULL){
+
+        
+        strcpy(line, user_list_head->username);
+        strcat(line, ";");
+        strcat(line, user_list_head->password);
+        strcat(line, ";");
+        strcat(line, user_list_head->type);
+        
+        fprintf(conf_file, "%s\n", line);
+
+        memset(line, 0, strlen(line));
+        current_user = current_user->next;
+    }
+
+
+    fclose(conf_file);
+}
+
+void read_config_file(){
+
+    conf_file = fopen(filename, "r+");
+
+    if(conf_file == NULL){
+        error("ERROR OPENING CONFIGURATION FILE\n");
+        return;
+    }
+        
+
+    char line[BUF_SIZE];
+    char username[64], password[64], type[15];
+
+
+    while(fgets(line, BUF_SIZE, conf_file)) {
+
+        printf("%s\n", line);
+        
+        if(sscanf(line, "%63s;%63s;%14s", username, password, type) == 3){
+
+            if(!validate_user(username)){
+
+                printf("Duplicated user in config file\n");
+                continue;
+            }
+                
+            printf("sexoooooooo\n");
+
+            pUser temp_user = create_user(username, password, type);
+            
+            if(temp_user != NULL)
+                add_user(temp_user);
+
+        }
+
+        printf("%s\n", username);
+        printf("%s\n", password);
+        printf("%s\n", type);
+
     }
 
     fclose(conf_file);
 }
 
-void init() {
-
-    users_array = malloc(sizeof(User)*USERS_AMOUNT + sizeof(char*)*3);
-	for(int i = 0; i < USERS_AMOUNT; ++i) {
-		users_array[i].socketfd = 0;
-        users_array[i].username = malloc(sizeof(char*));
-		strcpy(users_array[i].username, "");
-        users_array[i].password = malloc(sizeof(char*));
-		strcpy(users_array[i].password, "");
-        users_array[i].type = malloc(sizeof(char*));
-		strcpy(users_array[i].type, "");
-        
-        
-    }
-}
 
 void send_msg_udp(char *msg, int udp_fd, socklen_t cliente_socket_len, struct sockaddr_in client_addr){
 
@@ -141,7 +340,7 @@ void *udp(){
         input[recv_len]='\0';
 
         // add user
-        if (sscanf(input, "%s %s %s %s",action, username, password, type)){
+        if (sscanf(input, "%s %s %s %s", action, username, password, type)){
             if(!strcmp(action, "ADD_USER")){
                 
                 if(strlen(username) == 0 || strlen(password) == 0 || strlen(type) == 0){
@@ -150,12 +349,26 @@ void *udp(){
                     continue;
                 }
 
-                send_msg_udp("User created.\n", udp_fd, admin_socket_len, admin_addr);
+                if(!validate_user(username)){
+
+                    send_msg_udp("Username already in use.\n", udp_fd, admin_socket_len, admin_addr);
+                    continue;
+                }
+
+
+                pUser new_user = create_user(username, password, type);
+
+                if(new_user != NULL){
+
+                    add_user(new_user);
+                    send_msg_udp("User created.\n", udp_fd, admin_socket_len, admin_addr);
+                }
+                    
                 
             }
         }
         
-        if (sscanf(input, "%s %s",action, username)) {
+        if (sscanf(input, "%s %s", action, username)) {
             if(!strcmp(action, "DEL")){
         
                 if(strlen(username) == 0){
@@ -164,7 +377,8 @@ void *udp(){
                     continue;
                 }
 
-                send_msg_udp("User deleted.\n", udp_fd, admin_socket_len, admin_addr);
+                if(del_user(username))
+                    send_msg_udp("User deleted.\n", udp_fd, admin_socket_len, admin_addr);
 
             }
         }
@@ -196,11 +410,11 @@ void *tcp(){
     addr.sin_port = htons(tcp_port);
 
     if ( (tcp_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        error("na funcao socket");
+        error("ERRO na funcao socket");
     if ( bind(tcp_fd,(struct sockaddr*)&addr,sizeof(addr)) < 0)
-        error("na funcao bind");
+        error("ERRO na funcao bind");
     if( listen(tcp_fd, 5) < 0)
-        error("na funcao listen");
+        error("ERRO na funcao listen");
 
     client_addr_size = sizeof(client_addr);
 
@@ -245,27 +459,28 @@ void process_client(int client_fd)
     char msg[BUF_SIZE] = "Login: <username> <password>\n";
     write(client_fd, msg, strlen(msg));
 
-    bzero((void*) buffer, strlen(buffer));
-    nread = read(client_fd, buffer, BUF_SIZE-1);
-    buffer[nread] = '\0';
-    
-    if (sscanf(buffer, "%s %s", username, password)) {
+    do{
 
-        user = get_user(username, password);
-    
-        if(user == -1){
-
-            write(client_fd, "REJECTED\n", 9);
-            return;
-
-        }else
-            write(client_fd, "OK\n", 3);
-    }else
-        return;
-
+        bzero((void*) buffer, strlen(buffer));
+        nread = read(client_fd, buffer, BUF_SIZE-1);
+        buffer[nread] = '\0';
     
 
+        if (sscanf(buffer, "%s %s", username, password)) {
 
+            printf("%s\n", buffer);
+            user = get_user(username, password);
+        
+            if(user == -1)
+                write(client_fd, "REJECTED\n", 9);
+            else
+                write(client_fd, "OK\n", 3);
+
+        }
+
+    }while(user == -1);
+
+    //***** devolver ponteiro *****
     char* userType = users_array[user].type;
     users_array[user].socketfd = tcp_client_fd;
 
@@ -309,7 +524,7 @@ void process_client(int client_fd)
                 strcpy(classSize,token);
                 size = atoi(classSize);
 
-                write(client_fd, "OK\n", 3);
+                write(users_array[user].socketfd, "OK\n", 3);
             }
 
             if(strcmp(action, "SEND") == 0){
@@ -319,7 +534,7 @@ void process_client(int client_fd)
                 token = strtok(NULL, " ");
                 strcpy(subTxt,token);
 
-                write(client_fd, "SEND\n", 5);
+                write(users_array[user].socketfd, "SEND\n", 5);
 
             }
 
@@ -337,26 +552,31 @@ int main(int argc, char *argv[]) {
 
     pthread_t threads[2];
 
+    users_amount = 0;
     //Signal handling
    // signal(SIGINT, sigint);
 
     tcp_port = atoi(argv[1]);
     udp_port = atoi(argv[2]);
 
-    
+    filename = argv[3];
 
-	init();
-	read_config_file(argv[3]);
+	read_config_file();
 
-    pthread_create(&threads[0], NULL, udp, NULL);
-    pthread_create(&threads[1], NULL, tcp, NULL);
+    //pthread_create(&threads[0], NULL, udp, NULL);
+    //pthread_create(&threads[1], NULL, tcp, NULL);
 
-    
+    show_user_list();
 
     //Wait for all threads to finish
-	for(int i = 0; i < 2; ++i) {
+    /*
+    for(int i = 0; i < 2; ++i) {
 		pthread_join(threads[i], NULL);
 	}
+    */
+	
+
+    //save_config_file();
 
   return 0;
 }
