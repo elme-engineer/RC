@@ -6,18 +6,12 @@ void show_user_list(){
 
     pUser temp_node = user_list_head;
 
-    printf("nigaaaaaaaaaaaa\n");
-
     while(temp_node != NULL){
 
         printf("%s %s %s\n", temp_node->username, temp_node->password, temp_node->type);
 
-        printf("fdsssssss\n");
-
         temp_node = temp_node->next;
     }
-
-    printf("ssssssssssss\n");
 
 }
 
@@ -37,6 +31,19 @@ void add_user(pUser new_user){
         user_list_tail->next = new_user;
         new_user->prev = user_list_tail;
         user_list_tail = new_user;
+    }
+
+
+}
+
+void free_list(){
+
+    pUser temp_node = user_list_head;
+
+    while(temp_node != NULL){
+
+        free_node(temp_node);
+        temp_node = temp_node->next;
     }
 
 
@@ -179,6 +186,28 @@ pUser create_user(char *username, char *password, char *type){
 
 }
 
+
+pUser get_user(char *username, char *password){
+
+    pUser current_user = user_list_head;
+
+    while(current_user != NULL){
+
+
+        if(!strcmp(username, current_user->username)) {
+            if(!strcmp(password, current_user->password)) {
+                return current_user;
+            }
+
+        }
+
+        current_user = current_user->next;
+    }
+
+    return NULL;
+}
+
+
 void save_config_file(){
 
     conf_file = fopen(filename, "w+");
@@ -194,11 +223,11 @@ void save_config_file(){
     while(current_user != NULL){
 
         
-        strcpy(line, user_list_head->username);
+        strcpy(line, current_user->username);
         strcat(line, ";");
-        strcat(line, user_list_head->password);
+        strcat(line, current_user->password);
         strcat(line, ";");
-        strcat(line, user_list_head->type);
+        strcat(line, current_user->type);
         
         fprintf(conf_file, "%s\n", line);
 
@@ -226,28 +255,29 @@ void read_config_file(){
 
     while(fgets(line, BUF_SIZE, conf_file)) {
 
-        printf("%s\n", line);
-        
-        if(sscanf(line, "%63s;%63s;%14s", username, password, type) == 3){
+        line[strcspn(line, "\n")] = 0;
+
+        if (sscanf(line, "%63[^;];%63[^;];%14s", username, password, type) == 3) {
+
+            username[63] = '\0';
+            password[63] = '\0';
+            type[14] = '\0';
+
 
             if(!validate_user(username)){
 
                 printf("Duplicated user in config file\n");
                 continue;
             }
-                
-            printf("sexoooooooo\n");
+
 
             pUser temp_user = create_user(username, password, type);
             
             if(temp_user != NULL)
                 add_user(temp_user);
 
-        }
 
-        printf("%s\n", username);
-        printf("%s\n", password);
-        printf("%s\n", type);
+        }    
 
     }
 
@@ -399,7 +429,7 @@ void *udp(){
     }
 }
 
-void *tcp(){
+/*void *tcp(){
 
     struct sockaddr_in addr, client_addr;
     int tcp_fd, client_addr_size;
@@ -435,23 +465,11 @@ void *tcp(){
         close(tcp_client_fd);
         }
   }
-}
+}*/
 
-int get_user(char *username, char *password) {
 
-    for(int i = 0; i < USERS_AMOUNT; ++i) {
-        if(strcmp(username, users_array[i].username) == 0) {
-            if(strcmp(password, users_array[i].password) == 0) {
-                return i;
-            }
-       }
-    }
+/*void process_client(int client_fd){
 
-    return -1;
-}
-
-void process_client(int client_fd)
-{
 	int nread = 0, user, size;
 	char buffer[BUF_SIZE], name[64], action[20], classSize[4], subTxt[50];
     char username[64], password[64];
@@ -480,7 +498,7 @@ void process_client(int client_fd)
 
     }while(user == -1);
 
-    //***** devolver ponteiro *****
+    //---------- devolver ponteiro ------------
     char* userType = users_array[user].type;
     users_array[user].socketfd = tcp_client_fd;
 
@@ -542,9 +560,9 @@ void process_client(int client_fd)
 
 
     } while (nread>0);
-}
+}*/
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]){
 
 
     if(argc != 4) 
@@ -566,17 +584,19 @@ int main(int argc, char *argv[]) {
     //pthread_create(&threads[0], NULL, udp, NULL);
     //pthread_create(&threads[1], NULL, tcp, NULL);
 
-    show_user_list();
-
+ 
     //Wait for all threads to finish
     /*
     for(int i = 0; i < 2; ++i) {
 		pthread_join(threads[i], NULL);
 	}
     */
-	
 
-    //save_config_file();
+    show_user_list();
+
+    save_config_file();
+
+    free_list();
 
   return 0;
 }
