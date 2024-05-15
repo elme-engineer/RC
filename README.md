@@ -11,12 +11,13 @@
 - `free_node()`
 - `void free_list()`
 - `pUser get_user()`
-- `int del_user(char *username);`
+- `int del_user()`
+- `void list_user()`
 
 
 ## INCOMPLET FUNCTIONS ❌
 
-- `void *udp()`
+- `void *udp()` (quit_server needs better handling)
 - `void *tcp()`
 - `void process_client()`
 
@@ -24,7 +25,7 @@
 ## OTHER STUFF TO DO ❕
 
 - Handle client request with the server (tcp)
-- Finish admin actions (udp)
+- QUIT_SERVER in udp
 
     #### Student And Professor Actions
 

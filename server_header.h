@@ -14,9 +14,8 @@
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
+#include <ctype.h>
 
-
-#define USERS_AMOUNT 50
 #define BUF_SIZE	512
 
 int tcp_client_fd, udp_port, tcp_port;
@@ -36,7 +35,6 @@ typedef struct user{
 
 }User, *pUser;
 
-User* users_array;
 
 pUser user_list_head;
 pUser user_list_tail;
@@ -55,5 +53,5 @@ void add_user(pUser new_user);
 int del_user(char *username);
 pUser get_user(char *username, char *password);
 void send_msg_udp(char *msg, int udp_fd, socklen_t cliente_socket_len, struct sockaddr_in client_addr);
-
+void list_user(int udp_fd, socklen_t cliente_socket_len, struct sockaddr_in client_addr);
 #endif

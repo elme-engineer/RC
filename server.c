@@ -1,7 +1,19 @@
+/**
+ * @file server.c
+ * @author Pedro Migue Candeias Bento / Tiago Pereira Costa e Silva
+ * @brief 
+ * @version 0.1
+ * @date 2024-05-13
+ * 
+ * @copyright Copyright (c) 2024
+ * 
+ */
+
 #include "server_header.h"
 
 FILE* conf_file;
 
+// FUNCTION ONLY FOR DEBUGGING
 void show_user_list(){
 
     pUser temp_node = user_list_head;
@@ -116,7 +128,26 @@ int del_user(char *username){
     return 0;
 }
 
-//check if user already exists
+
+void list_user(int udp_fd, socklen_t cliente_socket_len, struct sockaddr_in client_addr){
+
+    if (user_list_head == NULL)
+        send_msg_udp("No users\n", udp_fd, cliente_socket_len, client_addr);
+
+    pUser temp_node = user_list_head;
+
+    send_msg_udp("User List:\n", udp_fd, cliente_socket_len, client_addr);
+
+    while(temp_node != NULL){
+
+        char *msg = temp_node->username;
+        strcat(msg, "\n");
+        send_msg_udp(msg, udp_fd, cliente_socket_len, client_addr);
+        temp_node = temp_node->next;
+    }
+}
+
+
 int validate_user(char *username){
 
     pUser current_user = user_list_head;
@@ -132,12 +163,14 @@ int validate_user(char *username){
     return 1;
 }
 
+
 pUser create_user(char *username, char *password, char *type){
 
     pUser new_user = malloc(sizeof(struct user));
     new_user->username = malloc(sizeof(strlen(username + 1)));
     new_user->password = malloc(sizeof(strlen(password + 1)));
     new_user->type = malloc(sizeof(strlen(type + 1)));
+
 
     if(new_user->type == NULL){
 
@@ -172,10 +205,24 @@ pUser create_user(char *username, char *password, char *type){
         free(new_user);
         return NULL;
     }
-
+    
+        
     strcpy(new_user->username, username);
     strcpy(new_user->password, password);
     strcpy(new_user->type, type);
+
+    // string to lower
+    for(int i = 0; new_user->type[i]; i++)
+        new_user->type[i] = tolower(new_user->type[i]);
+
+
+    if (strcmp(new_user->type, "aluno") && strcmp(new_user->type, "professor") && strcmp(new_user->type, "administrator")){
+
+        free_node(new_user);
+        return NULL;
+    }
+
+
     new_user->socketfd = 0;
     new_user->next = NULL;
     new_user->prev = NULL;
@@ -297,8 +344,9 @@ void *udp(){
     socklen_t admin_socket_len = sizeof(admin_addr);
     char  action[15], username[64], password[64], type[15];
     int udp_fd, recv_len;
-    int user = 0, admin = 0;
+    int admin = 0;
     char input[BUF_SIZE];
+    pUser user = NULL;
 
     
     
@@ -326,7 +374,7 @@ void *udp(){
 
         input[recv_len]='\0';
 
-        if (sscanf(input, "%s %s %s",action, username, password)){
+        if (sscanf(input, "%s %s %s", action, username, password)){
             if(!strcmp(action, "LOGIN")){
 
                 if(strlen(username) == 0 || strlen(password) == 0){
@@ -335,12 +383,12 @@ void *udp(){
                 }
                 user = get_user(username, password);
 
-                if(user == -1){
+                if(user == NULL){
                     send_msg_udp("Login rejected.\n", udp_fd, admin_socket_len, admin_addr);
                     continue;
                 }
 
-                if(!strcmp(users_array[user].type, "administrator")){
+                if(!strcmp(user->type, "administrator")){
 
                     send_msg_udp("Welcome!\n", udp_fd, admin_socket_len, admin_addr);
                     admin = 1;
@@ -392,7 +440,8 @@ void *udp(){
 
                     add_user(new_user);
                     send_msg_udp("User created.\n", udp_fd, admin_socket_len, admin_addr);
-                }
+                }else
+                    send_msg_udp("User could not be created.\n", udp_fd, admin_socket_len, admin_addr);
                     
                 
             }
@@ -409,14 +458,14 @@ void *udp(){
 
                 if(del_user(username))
                     send_msg_udp("User deleted.\n", udp_fd, admin_socket_len, admin_addr);
-
+                else
+                    send_msg_udp("User not found.\n", udp_fd, admin_socket_len, admin_addr);
             }
         }
         if (sscanf(input, "%s",action)){
-            if(!strcmp(action, "LIST")){
-                
-                send_msg_udp("User list:\n", udp_fd, admin_socket_len, admin_addr);
-            }
+            if(!strcmp(action, "LIST"))
+                list_user(udp_fd, admin_socket_len, admin_addr);
+
 
             if(!strcmp(action, "QUIT_SERVER")){
         
@@ -466,7 +515,6 @@ void *udp(){
         }
   }
 }*/
-
 
 /*void process_client(int client_fd){
 
@@ -581,7 +629,7 @@ int main(int argc, char *argv[]){
 
 	read_config_file();
 
-    //pthread_create(&threads[0], NULL, udp, NULL);
+    pthread_create(&threads[0], NULL, udp, NULL);
     //pthread_create(&threads[1], NULL, tcp, NULL);
 
  
@@ -592,7 +640,7 @@ int main(int argc, char *argv[]){
 	}
     */
 
-    show_user_list();
+    pthread_join(threads[0], NULL);
 
     save_config_file();
 
